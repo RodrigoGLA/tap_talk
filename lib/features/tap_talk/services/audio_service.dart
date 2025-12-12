@@ -1,9 +1,10 @@
+// audio_service.dart
 import 'dart:async';
-
-import 'package:permission_handler/permission_handler.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
+
+import 'package:tap_talk/core/services/permissions_service.dart';
 
 class AudioService {
   static final AudioService instance = AudioService._();
@@ -15,35 +16,10 @@ class AudioService {
   String? _lastRecordPath;
   String? get lastRecordPath => _lastRecordPath;
 
-  Future<bool> ensureMicPermission() async {
-    try {
-      final status = await Permission.microphone.status;
-
-      if (status.isGranted) {
-        return true;
-      }
-
-      if (status.isDenied) {
-        final result = await Permission.microphone.request();
-        return result.isGranted;
-      }
-
-      if (status.isPermanentlyDenied) {
-        await openAppSettings();
-        return false;
-      }
-
-      return false;
-    } catch (e) {
-      print("Error while checking microphone permission: $e");
-      return false;
-    }
-  }
-
   Future<bool> startRecording() async {
     try {
-      if (!await ensureMicPermission()) {
-        print("Mic permission not garanted.");
+      if (!await PermissionsService.requestMicPermission()) {
+        print("Mic permission not granted.");
         return false;
       }
 
@@ -63,10 +39,10 @@ class AudioService {
           '${dir.path}/my_recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
       await _recorder.start(config, path: filePath);
-      print("Grabando en $filePath");
+      print("Recording at $filePath");
       return true;
     } catch (e) {
-      print("Error al iniciar la grabación: $e");
+      print("Error starting recording: $e");
       return false;
     }
   }
@@ -75,21 +51,21 @@ class AudioService {
     try {
       final path = await _recorder.stop();
       _lastRecordPath = path;
-      print("Archivo guardado en $path");
+      print("Saved recording at $path");
 
-      if(playAfter && path != null){
+      if (playAfter && path != null) {
         Timer(const Duration(seconds: 1), () {
           playLastRecording();
         });
       }
       return path;
     } catch (e) {
-      print("Error al detener la grabación: $e");
+      print("Error stopping recording: $e");
       return null;
     }
   }
 
-    Future<void> playLastRecording() async {
+  Future<void> playLastRecording() async {
     if (_lastRecordPath == null) return;
 
     try {
